@@ -44,10 +44,21 @@ class Dns(callbacks.Plugin):
 
     dns = adns.init()
     unknownReply = 'I did not understand that query.'
+    _hostExpr = re.compile(r'^[a-z0-9][a-z0-9\.-]*\.[a-z]{2,3}$', re.I)
     
     def _lookup(self, domain, type):
         return self.dns.synchronous(domain, eval('adns.rr.%s' % type))
-        
+       
+    def _resolve(self, domain):
+        reply = []
+        records = self._lookup(domain, 'A')
+        if records[3]:
+            for record in records[3]:
+                reply.append('%s' % record)
+            return ', '.join(reply)
+        else:
+            return None
+
     def aa(self, irc, msg, args, domain):
         """<domain>
         Look up A record for a domain"""
@@ -64,6 +75,24 @@ class Dns(callbacks.Plugin):
         else:
             irc.reply(self.unknownReply)
 
+    aa = wrap(aa, [('matches', _hostExpr, 'Invalid domain (hopefully)')])
+
+    def ptr(self, irc, msg, args, ip):
+        """<ip>
+        Find PTR record for an IP address"""
+        
+        domain = "%s.in-addr.arpa" % '.'.join(reversed(ip.split('.')))
+        reply = []
+        records = self._lookup(domain, 'PTR')
+        if records[3]:
+            for record in records[3]:
+                reply.append('%s' % record)
+            irc.reply(', '.join(reply))
+        else:
+            irc.reply('Nothing found.')
+
+    ptr = wrap(ptr, ['ip'])
+
     def cname(self, irc, msg, args, domain):
         """<domain>
         Look up CNAME record for a domain"""
@@ -72,14 +101,17 @@ class Dns(callbacks.Plugin):
             reply = []
             records = self._lookup(domain, 'CNAME')
             if records[3]:
-                for record in records[3]:
-                    reply.append('%s' % record)
+                for idx, record in enumerate(records[3]):
+                    reply.append('%s' % record.lower())
+                    aa = self._resolve(record)
+                    if aa: reply[idx] += ' (%s)' % aa
                 irc.reply(', '.join(reply))
             else:
                 irc.reply('Nothing found.')
         else:
             irc.reply(self.unknownReply)
 
+    cname = wrap(cname, [('matches', _hostExpr, 'Invalid domain (hopefully)')])
 
     def mx(self, irc, msg, args, domain):
         """<domain>
@@ -97,14 +129,20 @@ class Dns(callbacks.Plugin):
                         cname_record = self._lookup(record[1][0], 'CNAME')
                         if cname_record[3]:
                             mxip = 'CNAME for %s' % cname_record[3][0]
+                            # Find IP for CNAME
+                            aa = self._resolve(cname_record[3][0])
+                            if aa: mxip += ' (%s)' % aa
                         else:
                             mxip = 'Unknown'
-                    reply.append(('%s (%s)' % (record[1][0], mxip)))
+                    reply.append(('%s %s (%s)' % 
+                        (record[0], record[1][0].lower(), mxip)))
                 irc.reply(', '.join(reply))
             else:
                 irc.reply('Nothing found.')
         else:
             irc.reply(unknownReply)
+    
+    mx = wrap(mx, [('matches', _hostExpr, 'Invalid domain (hopefully)')])
 
     def ns(self, irc, msg, args, domain):
         """<domain>
@@ -115,12 +153,15 @@ class Dns(callbacks.Plugin):
             records = self._lookup(domain, 'NS')
             if records[3]:
                 for record in records[3]:
-                    reply.append('%s (%s)' % (record[0], record[2][0][1]))
+                    reply.append('%s (%s)' % 
+                        (record[0].lower(), record[2][0][1]))
                 irc.reply(', '.join(reply))
             else:
                 irc.reply('Nothing found.')
         else:
             irc.reply(unknownReply)
+    
+    ns = wrap(ns, [('matches', _hostExpr, 'Invalid domain (hopefully)')])
 
     def txt(self, irc, msg, args, domain):
         """<domain>
@@ -138,12 +179,7 @@ class Dns(callbacks.Plugin):
         else:
             irc.reply(self.unknownReply)
 
-    _hostExpr = re.compile(r'^[a-z0-9][a-z0-9\.-]*\.[a-z]{2,3}$', re.I)
-    aa     = wrap(aa,    [('matches', _hostExpr, 'Invalid domain (hopefully)')])
-    cname  = wrap(cname, [('matches', _hostExpr, 'Invalid domain (hopefully)')])
-    mx     = wrap(mx,    [('matches', _hostExpr, 'Invalid domain (hopefully)')])
-    ns     = wrap(ns,    [('matches', _hostExpr, 'Invalid domain (hopefully)')])
-    txt    = wrap(txt,   [('matches', _hostExpr, 'Invalid domain (hopefully)')])
+    txt = wrap(txt, [('matches', _hostExpr, 'Invalid domain (hopefully)')])
 
 Class = Dns
 
