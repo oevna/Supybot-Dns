@@ -48,7 +48,6 @@ class Dns(callbacks.Plugin):
 
     dns = adns.init()
     unknownReply = 'I did not understand that query.'
-    #_hostExpr = re.compile(r'^[a-z0-9][a-z0-9\.-]*\.[a-z]{2,3}$', re.I)
     _hostExpr = re.compile(utils.web.domain)
 
     def _lookup(self, domain, type):
