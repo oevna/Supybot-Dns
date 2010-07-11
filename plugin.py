@@ -33,9 +33,13 @@ from supybot.commands import *
 import supybot.plugins as plugins
 import supybot.ircutils as ircutils
 import supybot.callbacks as callbacks
-
-import adns
 import re
+
+try:
+    import adns
+except ImportError:
+    irc.error('The adns module is required to use this plugin. '
+              'See README.txt.', Raise=True)
 
 class Dns(callbacks.Plugin):
     """
@@ -44,8 +48,9 @@ class Dns(callbacks.Plugin):
 
     dns = adns.init()
     unknownReply = 'I did not understand that query.'
-    _hostExpr = re.compile(r'^[a-z0-9][a-z0-9\.-]*\.[a-z]{2,3}$', re.I)
-    
+    #_hostExpr = re.compile(r'^[a-z0-9][a-z0-9\.-]*\.[a-z]{2,3}$', re.I)
+    _hostExpr = re.compile(utils.web.domain)
+
     def _lookup(self, domain, type):
         return self.dns.synchronous(domain, eval('adns.rr.%s' % type))
        
@@ -75,7 +80,7 @@ class Dns(callbacks.Plugin):
         else:
             irc.reply(self.unknownReply)
 
-    aa = wrap(aa, [('matches', _hostExpr, 'Invalid domain (hopefully)')])
+    aa = wrap(aa, [('matches', _hostExpr, 'Invalid domain')])
 
     def ptr(self, irc, msg, args, ip):
         """<ip>
@@ -111,7 +116,7 @@ class Dns(callbacks.Plugin):
         else:
             irc.reply(self.unknownReply)
 
-    cname = wrap(cname, [('matches', _hostExpr, 'Invalid domain (hopefully)')])
+    cname = wrap(cname, [('matches', _hostExpr, 'Invalid domain')])
 
     def mx(self, irc, msg, args, domain):
         """<domain>
@@ -142,7 +147,7 @@ class Dns(callbacks.Plugin):
         else:
             irc.reply(unknownReply)
     
-    mx = wrap(mx, [('matches', _hostExpr, 'Invalid domain (hopefully)')])
+    mx = wrap(mx, [('matches', _hostExpr, 'Invalid domain')])
 
     def ns(self, irc, msg, args, domain):
         """<domain>
@@ -161,7 +166,7 @@ class Dns(callbacks.Plugin):
         else:
             irc.reply(unknownReply)
     
-    ns = wrap(ns, [('matches', _hostExpr, 'Invalid domain (hopefully)')])
+    ns = wrap(ns, [('matches', _hostExpr, 'Invalid domain')])
 
     def txt(self, irc, msg, args, domain):
         """<domain>
@@ -179,7 +184,7 @@ class Dns(callbacks.Plugin):
         else:
             irc.reply(self.unknownReply)
 
-    txt = wrap(txt, [('matches', _hostExpr, 'Invalid domain (hopefully)')])
+    txt = wrap(txt, [('matches', _hostExpr, 'Invalid domain')])
 
 Class = Dns
 
