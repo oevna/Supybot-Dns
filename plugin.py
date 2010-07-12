@@ -48,7 +48,7 @@ class Dns(callbacks.Plugin):
 
     dns = adns.init()
     unknownReply = 'I did not understand that query.'
-    _hostExpr = re.compile(utils.web.domain)
+    _hostExpr = re.compile(utils.web._domain)
 
     def _lookup(self, domain, type):
         return self.dns.synchronous(domain, eval('adns.rr.%s' % type))
