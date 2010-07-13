@@ -51,11 +51,32 @@ class Dns(callbacks.Plugin):
     _hostExpr = re.compile(utils.web._domain)
 
     def _lookup(self, domain, type):
-        return self.dns.synchronous(domain, eval('adns.rr.%s' % type))
-       
+        records = self.dns.synchronous(domain, eval('adns.rr.%s' % type))
+        try: adns.exception(records[0])
+        except (adns.RemoteFailureError, 
+                adns.LocalError, 
+                adns.NotReady, 
+                adns.QueryError,
+                adns.RemoteConfigError, 
+                adns.RemoteTempError), e:
+            # 100: Inconsistent resource records in DNS
+            if e[0] != 100: raise Exception(e)
+        except (adns.NXDomain, adns.NoData):
+            pass
+        return records
+        
     def _resolve(self, domain):
         reply = []
         records = self._lookup(domain, 'A')
+        try: adns.exception(records[0])
+        except (adns.RemoteFailureError, 
+                adns.LocalError, adns.NotReady, 
+                adns.QueryError,
+                adns.RemoteConfigError, 
+                adns.RemoteTempError), e:
+            if e[0] != 100: raise Exception(e)
+        except (adns.NXDomain, adns.NoData):
+            pass
         if records[3]:
             for record in records[3]:
                 reply.append('%s' % record)
@@ -69,25 +90,28 @@ class Dns(callbacks.Plugin):
         domain = domain.group(0)
         if domain is not None:
             reply = []
-            records = self._lookup(domain, 'A')
+            try:   records = self._lookup(domain, 'A')
+            except Exception, e:
+                irc.error(e, Raise=True)
             if records[3]:
                 for record in records[3]:
                     reply.append('%s' % record)
                 irc.reply(', '.join(reply))
-            else:
+            else: 
                 irc.reply('Nothing found.')
         else:
-            irc.reply(self.unknownReply)
+            irc.error(self.unknownReply)
 
-    aa = wrap(aa, [('matches', _hostExpr, 'Invalid domain')])
+    aa = thread(wrap(aa, [('matches', _hostExpr, 'Invalid domain')]))
 
     def ptr(self, irc, msg, args, ip):
         """<ip>
         Find PTR record for an IP address"""
-        
         domain = "%s.in-addr.arpa" % '.'.join(reversed(ip.split('.')))
         reply = []
-        records = self._lookup(domain, 'PTR')
+        try:   records = self._lookup(domain, 'PTR')
+        except Exception, e:
+            irc.error(e, Raise=True)
         if records[3]:
             for record in records[3]:
                 reply.append('%s' % record)
@@ -95,7 +119,7 @@ class Dns(callbacks.Plugin):
         else:
             irc.reply('Nothing found.')
 
-    ptr = wrap(ptr, ['ip'])
+    ptr = thread(wrap(ptr, ['ip']))
 
     def cname(self, irc, msg, args, domain):
         """<domain>
@@ -103,19 +127,23 @@ class Dns(callbacks.Plugin):
         domain = domain.group(0)
         if domain is not None:
             reply = []
-            records = self._lookup(domain, 'CNAME')
+            try:   records = self._lookup(domain, 'CNAME')
+            except Exception, e:
+               irc.error(e, Raise=True)
             if records[3]:
                 for idx, record in enumerate(records[3]):
                     reply.append('%s' % record.lower())
-                    aa = self._resolve(record)
+                    try:   aa = self._resolve(record)
+                    except Exception, e:
+                        irc.error(e, Raise=True)
                     if aa: reply[idx] += ' (%s)' % aa
                 irc.reply(', '.join(reply))
             else:
                 irc.reply('Nothing found.')
         else:
-            irc.reply(self.unknownReply)
+            irc.error(self.unknownReply)
 
-    cname = wrap(cname, [('matches', _hostExpr, 'Invalid domain')])
+    cname = thread(wrap(cname, [('matches', _hostExpr, 'Invalid domain')]))
 
     def mx(self, irc, msg, args, domain):
         """<domain>
@@ -123,18 +151,24 @@ class Dns(callbacks.Plugin):
         domain = domain.group(0)
         if domain is not None:
             reply = []
-            records = self._lookup(domain, 'MX')
+            try:   records = self._lookup(domain, 'MX')
+            except Exception, e:
+                irc.error(e, Raise=True)
             if records[3]:
                 for record in records[3]:
                     if record[1][2]:
                         mxip = record[1][2][0][1]
                     # Determine if returned name is actually a CNAME                    
                     else:
-                        cname_record = self._lookup(record[1][0], 'CNAME')
+                        try: cname_record = self._lookup(record[1][0], 'CNAME')
+                        except Exception, e:
+                            irc.error(e, Raise=True)
                         if cname_record[3]:
                             mxip = 'CNAME for %s' % cname_record[3][0]
                             # Find IP for CNAME
-                            aa = self._resolve(cname_record[3][0])
+                            try:   aa = self._resolve(cname_record[3][0])
+                            except Exception, e:
+                                irc.error(e, Raise=True)
                             if aa: mxip += ' (%s)' % aa
                         else:
                             mxip = 'Unknown'
@@ -146,7 +180,7 @@ class Dns(callbacks.Plugin):
         else:
             irc.reply(unknownReply)
     
-    mx = wrap(mx, [('matches', _hostExpr, 'Invalid domain')])
+    mx = thread(wrap(mx, [('matches', _hostExpr, 'Invalid domain')]))
 
     def ns(self, irc, msg, args, domain):
         """<domain>
@@ -154,7 +188,9 @@ class Dns(callbacks.Plugin):
         domain = domain.group(0)
         if domain is not None:
             reply = []
-            records = self._lookup(domain, 'NS')
+            try:   records = self._lookup(domain, 'NS')
+            except Exception, e:
+                irc.error(e, Raise=True)
             if records[3]:
                 for record in records[3]:
                     reply.append('%s (%s)' % 
@@ -165,7 +201,7 @@ class Dns(callbacks.Plugin):
         else:
             irc.reply(unknownReply)
     
-    ns = wrap(ns, [('matches', _hostExpr, 'Invalid domain')])
+    ns = thread(wrap(ns, [('matches', _hostExpr, 'Invalid domain')]))
 
     def txt(self, irc, msg, args, domain):
         """<domain>
@@ -173,7 +209,9 @@ class Dns(callbacks.Plugin):
         domain = domain.group(0)
         if domain is not None:
             reply = []
-            records = self._lookup(domain, 'TXT')            
+            try:   records = self._lookup(domain, 'TXT')            
+            except Exception, e:
+                irc.error(e, Raise=True)
             if records[3]:
                 for record in records[3]:
                     reply.append(record[0])
@@ -181,9 +219,9 @@ class Dns(callbacks.Plugin):
             else:
                 irc.reply('Nothing found.')
         else:
-            irc.reply(self.unknownReply)
+            irc.error(self.unknownReply)
 
-    txt = wrap(txt, [('matches', _hostExpr, 'Invalid domain')])
+    txt = thread(wrap(txt, [('matches', _hostExpr, 'Invalid domain')]))
 
 Class = Dns
 

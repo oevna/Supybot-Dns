@@ -32,6 +32,13 @@ from supybot.test import *
 
 class DnsTestCase(PluginTestCase):
     plugins = ('Dns',)
-
+    def testQueries(self):
+        self.assertError('Dns aa localhost')
+        self.assertNotError('Dns aa google.com')
+        self.assertNotError('Dns mx google.com')
+        self.assertNotError('Dns ns google.com')
+        self.assertNotError('Dns cname www.google.com')
+        self.assertNotError('Dns txt google.com')
+        self.assertNotError('Dns ptr 127.0.0.1')
 
 # vim:set shiftwidth=4 tabstop=4 expandtab textwidth=79:
