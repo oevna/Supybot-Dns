@@ -38,8 +38,9 @@ import re
 try:
     import adns
 except ImportError:
-    irc.error('The adns module is required to use this plugin. '
-              'See README.txt.', Raise=True)
+    raise callbacks.Error, \
+        'The adns module is required to use this plugin. ' \
+        'See README.txt.'
 
 class Dns(callbacks.Plugin):
     """
@@ -60,7 +61,7 @@ class Dns(callbacks.Plugin):
                 adns.RemoteConfigError, 
                 adns.RemoteTempError), e:
             # 100: Inconsistent resource records in DNS
-            if e[0] != 100: raise Exception(e)
+            if e[0] != 100: raise Exception(e[1])
         except (adns.NXDomain, adns.NoData):
             pass
         return records
