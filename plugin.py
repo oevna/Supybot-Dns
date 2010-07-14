@@ -33,7 +33,7 @@ from supybot.commands import *
 import supybot.plugins as plugins
 import supybot.ircutils as ircutils
 import supybot.callbacks as callbacks
-import re
+from sys import stderr
 
 try:
     import adns
@@ -46,12 +46,32 @@ class Dns(callbacks.Plugin):
     """
     Look up various DNS related information for a domain name"""
     threaded = True
-
-    dns = adns.init()
-    unknownReply = 'I did not understand that query.'
     _hostExpr = re.compile(utils.web._domain)
+    
+    def __init__(self, irc):
+        self.__parent = super(Dns, self)
+        self.__parent.__init__(irc)
+        self.unknownReply = 'I did not understand that query.'
+        self.nsconfig = ''
+        self.nameservers = self.registryValue('nameservers')
+        self._makeServerString(self.nameservers)
+        self.dns = adns.init(adns.iflags.noautosys, 
+                             sys.stderr, self.nsconfig)
+
+    def _makeServerString(self, servers):
+        self.nsconfig = ''
+        for server in servers:
+            self.nsconfig += "nameserver %s\n" % server
+
+    def _initServers(self):
+        if self.nameservers != self.registryValue('nameservers'):
+            self.nameservers = self.registryValue('nameservers')
+            self._makeServerString(self.nameservers)
+            self.dns = adns.init(adns.iflags.noautosys, 
+                                 sys.stderr, self.nsconfig)
 
     def _lookup(self, domain, type):
+        self._initServers()
         records = self.dns.synchronous(domain, eval('adns.rr.%s' % type))
         try: adns.exception(records[0])
         except (adns.RemoteFailureError, 
@@ -68,6 +88,7 @@ class Dns(callbacks.Plugin):
         
     def _resolve(self, domain):
         reply = []
+        self._initServers()
         records = self._lookup(domain, 'A')
         try: adns.exception(records[0])
         except (adns.RemoteFailureError, 
@@ -75,7 +96,7 @@ class Dns(callbacks.Plugin):
                 adns.QueryError,
                 adns.RemoteConfigError, 
                 adns.RemoteTempError), e:
-            if e[0] != 100: raise Exception(e)
+            if e[0] != 100: raise Exception(e[1])
         except (adns.NXDomain, adns.NoData):
             pass
         if records[3]:
@@ -179,7 +200,7 @@ class Dns(callbacks.Plugin):
             else:
                 irc.reply('Nothing found.')
         else:
-            irc.reply(unknownReply)
+            irc.reply(self.unknownReply)
     
     mx = thread(wrap(mx, [('matches', _hostExpr, 'Invalid domain')]))
 
@@ -200,7 +221,7 @@ class Dns(callbacks.Plugin):
             else:
                 irc.reply('Nothing found.')
         else:
-            irc.reply(unknownReply)
+            irc.reply(self.unknownReply)
     
     ns = thread(wrap(ns, [('matches', _hostExpr, 'Invalid domain')]))
 

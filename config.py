@@ -42,8 +42,9 @@ def configure(advanced):
 
 Dns = conf.registerPlugin('Dns')
 # This is where your configuration variables (if any) should go.  For example:
-# conf.registerGlobalValue(Dns, 'someConfigVariableName',
-#     registry.Boolean(False, """Help for someConfigVariableName."""))
+conf.registerGlobalValue(Dns, 'nameservers',
+    registry.SpaceSeparatedSetOfStrings([], """Determines what nameservers
+    should be used when querying DNS."""))
 
-
-# vim:set shiftwidth=4 tabstop=4 expandtab textwidth=79:
+   
+ # vim:set shiftwidth=4 tabstop=4 expandtab textwidth=79:
