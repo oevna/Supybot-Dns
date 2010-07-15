@@ -34,6 +34,7 @@ import supybot.plugins as plugins
 import supybot.ircutils as ircutils
 import supybot.callbacks as callbacks
 from sys import stderr
+import re
 
 try:
     import adns
@@ -56,7 +57,7 @@ class Dns(callbacks.Plugin):
         self.nameservers = self.registryValue('nameservers')
         self._makeServerString(self.nameservers)
         self.dns = adns.init(adns.iflags.noautosys, 
-                             sys.stderr, self.nsconfig)
+                             stderr, self.nsconfig)
 
     def _makeServerString(self, servers):
         self.nsconfig = ''
@@ -68,7 +69,7 @@ class Dns(callbacks.Plugin):
             self.nameservers = self.registryValue('nameservers')
             self._makeServerString(self.nameservers)
             self.dns = adns.init(adns.iflags.noautosys, 
-                                 sys.stderr, self.nsconfig)
+                                 stderr, self.nsconfig)
 
     def _lookup(self, domain, type):
         self._initServers()
